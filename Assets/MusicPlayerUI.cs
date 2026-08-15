@@ -27,6 +27,14 @@ public class MusicPlayerUI : MonoBehaviour
     [Header("プレイリスト")]
     public Transform playlistRoot;
     public GameObject playlistItemPrefab;
+    public int maxVisiblePlaylistItems = 6; // 背景の高さに収まる表示件数
+
+    [Header("アイコン")]
+    public Image playPauseIcon;
+    public Sprite playSprite;
+    public Sprite pauseSprite;
+    [Range(0f, 1f)] public float iconOpacity = 0.8f;    // 通常時の不透明度
+    [Range(0f, 1f)] public float iconOffOpacity = 0.1f; // シャッフル/リピートOFF時の不透明度
 
     private bool panelOpen = false;
 
@@ -86,7 +94,7 @@ void Update()
             Destroy(child.gameObject);
 
         var tracks = MusicPlayer.Instance.tracks;
-        var upcoming = MusicPlayer.Instance.GetUpcomingTrackOrder();
+        var upcoming = MusicPlayer.Instance.GetUpcomingTrackOrder(maxVisiblePlaylistItems);
         foreach (int trackIndex in upcoming)
         {
             GameObject item = Instantiate(playlistItemPrefab, playlistRoot);
@@ -120,6 +128,26 @@ void Update()
         if (repeatLabel != null)
             repeatLabel.text = MusicPlayer.Instance.repeat ? "REP ON" : "REP";
 
+        if (playPauseIcon != null && playSprite != null && pauseSprite != null)
+            playPauseIcon.sprite = MusicPlayer.Instance.IsPlaying ? pauseSprite : playSprite;
+
+        SetIconAlpha(prevButton, iconOpacity);
+        SetIconAlpha(nextButton, iconOpacity);
+        SetIconAlpha(playPauseButton, iconOpacity);
+        SetIconAlpha(shuffleButton, MusicPlayer.Instance.shuffle ? iconOpacity : iconOffOpacity);
+        SetIconAlpha(repeatButton, MusicPlayer.Instance.repeat ? iconOpacity : iconOffOpacity);
+
         BuildPlaylist();
+    }
+
+    void SetIconAlpha(Button button, float alpha)
+    {
+        if (button == null) return;
+        var colors = button.colors;
+        colors.normalColor = new Color(1f, 1f, 1f, alpha);
+        colors.highlightedColor = new Color(1f, 1f, 1f, Mathf.Min(1f, alpha + 0.15f));
+        colors.pressedColor = new Color(0.78f, 0.78f, 0.78f, alpha);
+        colors.selectedColor = colors.highlightedColor;
+        button.colors = colors;
     }
 }

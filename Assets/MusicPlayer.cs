@@ -83,12 +83,14 @@ void Update()
     }
 
     // 現在再生中の曲を除いた「次に再生される順」の曲インデックス一覧（先頭が次に再生される曲）
-    public List<int> GetUpcomingTrackOrder()
+    // maxCountを指定すると、先頭からその件数だけに絞って返す（-1で全件）
+    public List<int> GetUpcomingTrackOrder(int maxCount = -1)
     {
         var result = new List<int>();
         if (playOrder.Count == 0) return result;
 
-        for (int step = 1; step <= playOrder.Count; step++)
+        int count = maxCount < 0 ? playOrder.Count : Mathf.Min(maxCount, playOrder.Count);
+        for (int step = 1; step <= count; step++)
         {
             int idx = (currentOrderIndex + step) % playOrder.Count;
             result.Add(playOrder[idx]);
