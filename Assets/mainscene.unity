@@ -1586,6 +1586,7 @@ MonoBehaviour:
   playerButton: {fileID: 0}
   nowPlayingText: {fileID: 354353399}
   musicPlayerPanel: {fileID: 487637054}
+  trackNameText: {fileID: 779762787}
   playPauseButton: {fileID: 446973437}
   playPauseLabel: {fileID: 621736604}
   prevButton: {fileID: 497202354}
@@ -8092,8 +8093,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u66F2\u540D"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 1772bb05cc2d28f43914b5bacacecb6e, type: 2}
-  m_sharedMaterial: {fileID: -8085286135968347699, guid: 1772bb05cc2d28f43914b5bacacecb6e, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 49619adf995ce1a4588384a4132c1b78, type: 2}
+  m_sharedMaterial: {fileID: 7742909888946494033, guid: 49619adf995ce1a4588384a4132c1b78, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

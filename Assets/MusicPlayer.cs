@@ -34,6 +34,7 @@ public class MusicPlayer : MonoBehaviour
     }
 
 private bool isWaiting = true; // ★追加
+private bool isPaused = false;
 
 void Start()
 {
@@ -51,6 +52,7 @@ System.Collections.IEnumerator PlayAfterDelay()
 void Update()
 {
     if (isWaiting) return; // ★待機中は何もしない
+    if (isPaused) return; // 一時停止中は自動送りしない
 
     if (!audioSource.isPlaying && tracks.Length > 0)
     {
@@ -74,6 +76,24 @@ void Update()
                 playOrder[r] = tmp;
             }
         }
+
+        currentOrderIndex = 0;
+        if (playOrder.Count > 0)
+            CurrentTrackIndex = playOrder[currentOrderIndex];
+    }
+
+    // 現在再生中の曲を除いた「次に再生される順」の曲インデックス一覧（先頭が次に再生される曲）
+    public List<int> GetUpcomingTrackOrder()
+    {
+        var result = new List<int>();
+        if (playOrder.Count == 0) return result;
+
+        for (int step = 1; step <= playOrder.Count; step++)
+        {
+            int idx = (currentOrderIndex + step) % playOrder.Count;
+            result.Add(playOrder[idx]);
+        }
+        return result;
     }
 
     void PlayCurrent()
@@ -82,18 +102,21 @@ void Update()
         CurrentTrackIndex = playOrder[currentOrderIndex];
         audioSource.clip = tracks[CurrentTrackIndex];
         audioSource.Play();
+        isPaused = false;
         MusicPlayerUI.Instance?.UpdateUI();
     }
 
-    public void Play() 
-    { 
+    public void Play()
+    {
         audioSource.Play();
+        isPaused = false;
         MusicPlayerUI.Instance?.UpdateUI();
     }
 
     public void Pause()
     {
         audioSource.Pause();
+        isPaused = true;
         MusicPlayerUI.Instance?.UpdateUI();
     }
 

@@ -12,6 +12,7 @@ public class MusicPlayerUI : MonoBehaviour
 
     [Header("パネル")]
     public GameObject musicPlayerPanel;
+    public TextMeshProUGUI trackNameText; // パネル内の「曲名」表示
 
     [Header("コントロール")]
     public Button playPauseButton;
@@ -37,7 +38,6 @@ public class MusicPlayerUI : MonoBehaviour
     void Start()
     {
         musicPlayerPanel.SetActive(false);
-        BuildPlaylist();
         UpdateUI();
 
         playPauseButton.onClick.AddListener(OnPlayPause);
@@ -56,6 +56,15 @@ void Update()
 
     if (Input.GetKeyDown(KeyCode.B))
         MusicPlayer.Instance.Prev();
+
+    if (Input.GetKeyDown(KeyCode.P))
+        OnPlayPause();
+
+    if (Input.GetKeyDown(KeyCode.U))
+        MusicPlayer.Instance.ToggleShuffle();
+
+    if (Input.GetKeyDown(KeyCode.R))
+        MusicPlayer.Instance.ToggleRepeat();
 }
     public void TogglePanel()
     {
@@ -77,17 +86,17 @@ void Update()
             Destroy(child.gameObject);
 
         var tracks = MusicPlayer.Instance.tracks;
-        for (int i = 0; i < tracks.Length; i++)
+        var upcoming = MusicPlayer.Instance.GetUpcomingTrackOrder();
+        foreach (int trackIndex in upcoming)
         {
-            int index = i;
             GameObject item = Instantiate(playlistItemPrefab, playlistRoot);
             var label = item.GetComponentInChildren<TextMeshProUGUI>();
             if (label != null)
-                label.text = tracks[i].name;
+                label.text = tracks[trackIndex].name;
 
             var btn = item.GetComponent<Button>();
             if (btn != null)
-                btn.onClick.AddListener(() => MusicPlayer.Instance.PlayTrack(index));
+                btn.onClick.AddListener(() => MusicPlayer.Instance.PlayTrack(trackIndex));
         }
     }
 
@@ -99,6 +108,9 @@ void Update()
         if (nowPlayingText != null)
             nowPlayingText.text = "♪ " + trackName;
 
+        if (trackNameText != null)
+            trackNameText.text = trackName;
+
         if (playPauseLabel != null)
             playPauseLabel.text = MusicPlayer.Instance.IsPlaying ? "II" : "▶";
 
@@ -107,5 +119,7 @@ void Update()
 
         if (repeatLabel != null)
             repeatLabel.text = MusicPlayer.Instance.repeat ? "REP ON" : "REP";
+
+        BuildPlaylist();
     }
 }
