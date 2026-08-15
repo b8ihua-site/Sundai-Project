@@ -36,6 +36,7 @@ public class EnemyEncounter : MonoBehaviour
             BattleContext.EnemyMaxHP = enemyMaxHP;
             BattleContext.EnemyAttack= enemyAttack;
             BattleContext.Subject    = subjectName;
+            BattleContext.WindColor  = "";
 
             SceneManager.LoadScene(battleSceneName);
         }

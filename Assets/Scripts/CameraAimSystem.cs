@@ -26,6 +26,7 @@ public class CameraAimSystem : MonoBehaviour
     private Renderer[] avatarRenderers;
     private float normalDistance;
     private bool isAiming = false;
+    private IPhotographable currentAimTarget;
 
     void Start()
     {
@@ -52,6 +53,42 @@ public class CameraAimSystem : MonoBehaviour
             thirdPersonFollow.CameraDistance = Mathf.Lerp(
                 thirdPersonFollow.CameraDistance, aimDistance, Time.deltaTime * aimTransitionSpeed);
         }
+
+        if (isAiming)
+            UpdateAimTarget();
+    }
+
+    // 構え中、今まさに画面中央に捉えている対象を毎フレーム調べ、変化があればハイライトを切り替える
+    void UpdateAimTarget()
+    {
+        IPhotographable found = FindPhotoTarget();
+
+        if (found == currentAimTarget) return;
+
+        currentAimTarget?.SetAimHighlight(false);
+        found?.SetAimHighlight(true);
+        currentAimTarget = found;
+    }
+
+    IPhotographable FindPhotoTarget()
+    {
+        var cam = Camera.main;
+        if (cam == null) return null;
+
+        Ray ray = cam.ScreenPointToRay(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f));
+        var hits = Physics.RaycastAll(ray, photoRange, photoLayer);
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        foreach (var hit in hits)
+        {
+            // 自分自身（見えなくなっているだけで当たり判定は残っているアバター）は無視する
+            if (hit.collider.transform.IsChildOf(transform.root))
+                continue;
+
+            return hit.collider.GetComponent<IPhotographable>(); // 風以外なら null（＝手前に遮る物がある）
+        }
+
+        return null;
     }
 
     void StartAim()
@@ -99,6 +136,9 @@ public class CameraAimSystem : MonoBehaviour
 
         if (crosshair != null)
             crosshair.SetActive(false);
+
+        currentAimTarget?.SetAimHighlight(false);
+        currentAimTarget = null;
     }
 
     void SetAvatarVisible(bool visible)
@@ -110,16 +150,7 @@ public class CameraAimSystem : MonoBehaviour
 
     void TakePhoto()
     {
-        var cam = Camera.main;
-        if (cam == null) return;
-
-        Ray ray = cam.ScreenPointToRay(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f));
-
-        if (Physics.Raycast(ray, out RaycastHit hit, photoRange, photoLayer))
-        {
-            var target = hit.collider.GetComponent<IPhotographable>();
-            if (target != null)
-                target.OnPhotographed();
-        }
+        var target = FindPhotoTarget();
+        target?.OnPhotographed();
     }
 }

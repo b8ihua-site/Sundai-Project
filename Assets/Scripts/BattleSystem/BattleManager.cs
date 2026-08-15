@@ -51,6 +51,7 @@ public Vector2 playerPopupPos = new Vector2(400f, 350f);
     private int playerHP;
     private int enemyHP;
     private QuizQuestion currentQuestion;
+    private string windColor = ""; // BattleContext由来。知識の風との戦闘でなければ空文字
 
     void Awake()
     {
@@ -60,6 +61,19 @@ public Vector2 playerPopupPos = new Vector2(400f, 350f);
 
     void Start()
     {
+        // mainscene側（EnemyEncounter/BattleChoiceUI/KnowledgeWind）から渡された敵情報を反映
+        if (BattleContext.HasData)
+        {
+            enemyName   = BattleContext.EnemyName;
+            enemyMaxHP  = BattleContext.EnemyMaxHP;
+            enemyAttack = BattleContext.EnemyAttack;
+            subject     = BattleContext.Subject;
+            windColor   = BattleContext.WindColor;
+
+            BattleContext.HasData = false;
+            BattleContext.WindColor = "";
+        }
+
         battleUI.SetupCommandButtons(OnSelectFight, OnSelectItem, OnSelectRun);
 
         playerHP = playerMaxHP;
@@ -216,6 +230,10 @@ SEManager.Instance.Play("enemyAttack");
         battleUI.ShowResult(true);
         // WinSequence 内
 SEManager.Instance.Play("win");
+
+        if (!string.IsNullOrEmpty(windColor) && PlayerAbilities.Instance != null)
+            PlayerAbilities.Instance.AddAbility(windColor);
+
         yield return new WaitForSeconds(resultWait);
         ReturnToMainScene();
     }

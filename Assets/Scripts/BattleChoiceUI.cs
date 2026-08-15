@@ -59,6 +59,7 @@ public class BattleChoiceUI : MonoBehaviour
         BattleContext.EnemyMaxHP  = currentEnemy.enemyMaxHP;
         BattleContext.EnemyAttack = currentEnemy.enemyAttack;
         BattleContext.Subject     = currentEnemy.subject;
+        BattleContext.WindColor   = "";
 
         Hide();
         SceneManager.LoadScene(battleSceneName);
