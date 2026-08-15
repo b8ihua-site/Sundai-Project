@@ -11,21 +11,28 @@ public class CameraAimSystem : MonoBehaviour
     [Header("構え設定")]
     public float aimDistance = 1.5f;      // 構え時のカメラ距離
     public float aimTransitionSpeed = 8f; // ズームの補間速度
+    public float foundZoomDistance = 0.9f; // 発見した瞬間にさらに寄るカメラ距離
 
     [Header("撮影設定")]
     public float photoRange = 30f;
     public LayerMask photoLayer = ~0;
 
+    [Header("発見メッセージ")]
+    public string cancelLabel = "みのがす";
+    public string foundMessageFormat = "{0}を みつけた！";
+
     [Header("効果音")]
     public AudioSource audioSource;
     public AudioClip cameraSetSE;  // 構え始めた時
     public AudioClip cameraShotSE; // 撮影した時
+    public AudioClip encounterSE;  // 何かを見つけた時
 
     private Cinemachine3rdPersonFollow thirdPersonFollow;
     private StarterAssets.ThirdPersonController controller;
     private Renderer[] avatarRenderers;
     private float normalDistance;
     private bool isAiming = false;
+    private bool awaitingChoice = false; // 発見演出～たたかう/みのがす選択待ちの間
     private IPhotographable currentAimTarget;
 
     void Start()
@@ -42,6 +49,8 @@ public class CameraAimSystem : MonoBehaviour
 
     void Update()
     {
+        if (awaitingChoice) return; // 選択待ち中は構え/撮影の入力を受け付けない
+
         if (Input.GetMouseButtonDown(1))
             StartAim();
 
@@ -121,8 +130,62 @@ public class CameraAimSystem : MonoBehaviour
         if (audioSource != null && cameraShotSE != null)
             audioSource.PlayOneShot(cameraShotSE);
 
-        TakePhoto();
+        var target = FindPhotoTarget();
 
+        if (target != null)
+            HandleFound(target);
+        else
+            RestoreFromAim();
+    }
+
+    void HandleFound(IPhotographable target)
+    {
+        awaitingChoice = true;
+
+        target.OnPhotographed();
+
+        // カメラをさらに寄せて「アップ」にする
+        if (thirdPersonFollow != null)
+            thirdPersonFollow.CameraDistance = foundZoomDistance;
+
+        if (audioSource != null && encounterSE != null)
+            audioSource.PlayOneShot(encounterSE);
+
+        // BattleChoiceUIのパネルはuiRoot（メインCanvas）の子なので、
+        // 表示前にuiRootを戻しておかないと親ごと非表示のまま操作不能になる
+        if (uiRoot != null)
+            uiRoot.SetActive(true);
+
+        if (crosshair != null)
+            crosshair.SetActive(false);
+
+        string message = string.Format(foundMessageFormat, target.DisplayName);
+
+        if (BattleChoiceUI.Instance != null)
+        {
+            BattleChoiceUI.Instance.Show(message, cancelLabel,
+                onFightCallback: () =>
+                {
+                    awaitingChoice = false;
+                    target.Capture(); // 戦闘シーンに遷移するのでカメラ復帰は不要
+                },
+                onCancelCallback: () =>
+                {
+                    awaitingChoice = false;
+                    target.Release();
+                    RestoreFromAim();
+                });
+        }
+        else
+        {
+            // パネルが無ければ即座に確保しておく（フォールバック）
+            awaitingChoice = false;
+            target.Capture();
+        }
+    }
+
+    void RestoreFromAim()
+    {
         if (thirdPersonFollow != null)
             thirdPersonFollow.CameraDistance = normalDistance;
 
@@ -146,11 +209,5 @@ public class CameraAimSystem : MonoBehaviour
         if (avatarRenderers == null) return;
         foreach (var r in avatarRenderers)
             if (r != null) r.enabled = visible;
-    }
-
-    void TakePhoto()
-    {
-        var target = FindPhotoTarget();
-        target?.OnPhotographed();
     }
 }

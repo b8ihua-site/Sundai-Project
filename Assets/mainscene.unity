@@ -9145,6 +9145,7 @@ MonoBehaviour:
   audioSource: {fileID: 872775108}
   cameraSetSE: {fileID: 8300000, guid: cf3958d5400bc5444814697e056aa580, type: 3}
   cameraShotSE: {fileID: 8300000, guid: 7d09043ee90ccbe42a296503347aba11, type: 3}
+  encounterSE: {fileID: 8300000, guid: 64a96a3f9b88e9f4ba7724448ecd7adb, type: 3}
 --- !u!1 &891766040
 GameObject:
   m_ObjectHideFlags: 0
@@ -12314,6 +12315,7 @@ MonoBehaviour:
   panel: {fileID: 1265433471}
   fightButton: {fileID: 1716441330}
   cancelButton: {fileID: 1384493799}
+  cancelLabel: {fileID: 561668206}
   messageText: {fileID: 1806184356}
   battleSceneName: BattleScene
 --- !u!1 &1276767862 stripped
@@ -13513,7 +13515,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
   m_Navigation:
     m_Mode: 3
@@ -17593,7 +17595,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
   m_Navigation:
     m_Mode: 3
@@ -22245,6 +22247,7 @@ GameObject:
   - component: {fileID: 872775301}
   - component: {fileID: 872775302}
   - component: {fileID: 872775303}
+  - component: {fileID: 6677001122}
   m_Layer: 0
   m_Name: Crosshair
   m_TagString: Untagged
@@ -22498,3 +22501,16 @@ MonoBehaviour:
   ichigayaPower: 0
   abilityThreshold: 5
   level: 1
+--- !u!114 &6677001122
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 872775300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2a4c6e8b0d1729384a5b6c7d8e9f012, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::CrosshairRingBuilder
+  ringThickness: 0.15

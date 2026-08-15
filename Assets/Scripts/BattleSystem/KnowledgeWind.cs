@@ -41,8 +41,11 @@ public class KnowledgeWind : MonoBehaviour, IPhotographable
     private float noiseOffsetZ;
     private float pulseOffset;
     private bool materialized = false;
+    private bool found = false; // 発見演出～選択待ちの間、漂うのを止める
     private TextMeshPro nameLabel;
     private bool aimHighlighted = false;
+
+    public string DisplayName => enemyName;
 
     void Start()
     {
@@ -61,7 +64,7 @@ public class KnowledgeWind : MonoBehaviour, IPhotographable
 
     void Update()
     {
-        if (materialized) return;
+        if (materialized || found) return;
 
         float t = Time.time * driftSpeed;
         float x = (Mathf.PerlinNoise(noiseOffsetX, t) - 0.5f) * 2f * driftRadius;
@@ -81,11 +84,24 @@ public class KnowledgeWind : MonoBehaviour, IPhotographable
     }
 
     // カメラのIPhotographable経由で呼ばれる（撮影時に画面中心に捉えられていた場合）
+    // ここではまだ戦闘には入らず、発見演出（漂うのを止める）だけ行う
     public void OnPhotographed()
+    {
+        found = true;
+    }
+
+    // 「たたかう」が選ばれた
+    public void Capture()
     {
         if (materialized) return;
         materialized = true;
         Materialize();
+    }
+
+    // 「みのがす」が選ばれた
+    public void Release()
+    {
+        found = false; // 再び漂い始める
     }
 
     // カメラのIPhotographable経由で呼ばれる（構え中、今まさに狙われているかどうか）
