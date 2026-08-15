@@ -36,6 +36,10 @@ public class MusicPlayerUI : MonoBehaviour
     [Range(0f, 1f)] public float iconOpacity = 0.8f;    // 通常時の不透明度
     [Range(0f, 1f)] public float iconOffOpacity = 0.1f; // シャッフル/リピートOFF時の不透明度
 
+    [Header("レコード")]
+    public RectTransform recordIcon;
+    public float recordSpinSpeed = 90f; // 度/秒
+
     private bool panelOpen = false;
 
     void Awake()
@@ -73,6 +77,9 @@ void Update()
 
     if (Input.GetKeyDown(KeyCode.R))
         MusicPlayer.Instance.ToggleRepeat();
+
+    if (recordIcon != null && MusicPlayer.Instance != null && MusicPlayer.Instance.IsPlaying)
+        recordIcon.Rotate(0f, 0f, -recordSpinSpeed * Time.deltaTime);
 }
     public void TogglePanel()
     {
