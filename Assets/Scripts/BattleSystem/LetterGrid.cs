@@ -248,7 +248,7 @@ private readonly int[] numpadToIndex = {
         currentCells.Clear();
 
         isAnimating = false;
-        BattleManager.Instance.OnAnswerFinished(combo, currentAnswer.Length);
+        // LetterGridはDodgeArenaに置き換えられ、BattleManagerからは使われていない
     }
 
     void OnCellClicked(int index)

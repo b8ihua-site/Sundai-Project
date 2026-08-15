@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 using System;
 
@@ -30,6 +31,10 @@ public class BattleUI : MonoBehaviour
     public void ShowCommandPanel(bool show)
     {
         if (commandPanel != null) commandPanel.SetActive(show);
+
+        // 矢印キー/Enterで選べるよう、開いた瞬間に「たたかう」へフォーカスする
+        if (show && EventSystem.current != null && fightButton != null)
+            EventSystem.current.SetSelectedGameObject(fightButton.gameObject);
     }
 
     public void ShowMessage(string msg)

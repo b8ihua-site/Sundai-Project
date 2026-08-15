@@ -6,11 +6,12 @@ public class BattleManager : MonoBehaviour
 {
     public static BattleManager Instance;
 
-    public enum BattleState { Intro, Command, Question, Answering, PlayerAttack, EnemyTurn, Win, Lose }
+    public enum BattleState { Intro, Command, Question, Dodging, PlayerAttack, Win, Lose }
     public BattleState State { get; private set; }
 
     [Header("プレイヤー設定")]
     public int playerMaxHP = 100;
+    public int wrongHitDamage = 10; // 回避フェイズで被弾した時、1回あたりのダメージ
 
     [Header("敵設定")]
     public string enemyName = "なぞの敵";
@@ -41,9 +42,9 @@ public Vector2 playerPopupPos = new Vector2(400f, 350f);
     [Header("参照")]
     public QuizDatabase quizDatabase;
     public BattleUI battleUI;
-    public LetterGrid letterGrid;
+    public DodgeArena dodgeArena;
 
-    [Header("回答フェイズで表示するUI（GridParent / TimerSlider / ComboText を入れる）")]
+    [Header("回避フェイズで表示するUI（DodgeArenaのパネル等を入れる）")]
     public GameObject[] answerPhaseObjects;
 
     public string subject = "市ヶ谷";
@@ -52,6 +53,7 @@ public Vector2 playerPopupPos = new Vector2(400f, 350f);
     private int enemyHP;
     private QuizQuestion currentQuestion;
     private string windColor = ""; // BattleContext由来。知識の風との戦闘でなければ空文字
+    private bool playerDied = false;
 
     void Awake()
     {
@@ -81,6 +83,13 @@ public Vector2 playerPopupPos = new Vector2(400f, 350f);
         battleUI.UpdateHP(playerHP, playerMaxHP, enemyHP, enemyMaxHP);
 
         if (enemyObject != null) enemyObject.SetActive(false);
+
+        if (dodgeArena != null)
+        {
+            dodgeArena.OnWrongHit += HandleWrongHit;
+            dodgeArena.OnTurnEnd += HandleDodgeFinished;
+        }
+
         StartCoroutine(IntroSequence());
     }
 
@@ -147,7 +156,7 @@ SEManager.Instance.Play("select");
         ReturnToMainScene();
     }
 
-    // ---------- たたかう（問題→回答） ----------
+    // ---------- たたかう（問題→回避フェイズ） ----------
     IEnumerator QuestionSequence()
     {
         State = BattleState.Question;
@@ -159,23 +168,48 @@ SEManager.Instance.Play("select");
 SEManager.Instance.Play("question");
         yield return new WaitForSeconds(questionWait);
 
-        State = BattleState.Answering;       // 回答ターン開始
-        SetAnswerPhaseActive(true);          // 先にグリッドを表示してから
-        letterGrid.SetupGrid(currentQuestion.answer);
+        State = BattleState.Dodging;
+        SetAnswerPhaseActive(true);
+        playerDied = false;
+        dodgeArena.StartRound(currentQuestion.answer);
     }
 
-    // LetterGrid から呼ばれる
-    public void OnAnswerFinished(int combo, int totalChars)
+    // DodgeArenaから呼ばれる：順番違い／おとりに被弾した
+    void HandleWrongHit()
     {
+        if (State != BattleState.Dodging || playerDied) return;
+
+        int damage = wrongHitDamage;
+        playerHP = Mathf.Max(0, playerHP - damage);
+        PopupSpawner.Instance.SpawnDamage(damage, playerPopupPos);
+        battleUI.UpdateHP(playerHP, playerMaxHP, enemyHP, enemyMaxHP);
+
+        SEManager.Instance.Play("enemyAttack");
+        if (cameraTransform != null)
+            Shaker.Instance.Shake(cameraTransform, 0.2f, 0.25f);
+
+        if (playerHP <= 0)
+        {
+            playerDied = true;
+            dodgeArena.EndRoundImmediately();
+            SetAnswerPhaseActive(false);
+            StartCoroutine(LoseSequence());
+        }
+    }
+
+    // DodgeArenaから呼ばれる：全部の弾を捌き終わった（コンボ数, 文字数）
+    void HandleDodgeFinished(int combo, int totalChars)
+    {
+        if (playerDied) return; // 既に敗北処理に入っている場合は何もしない
+        SetAnswerPhaseActive(false);
         StartCoroutine(PlayerAttackSequence(combo, totalChars));
     }
 
     IEnumerator PlayerAttackSequence(int combo, int totalChars)
     {
         State = BattleState.PlayerAttack;
-        SetAnswerPhaseActive(false);
 
-        float ratio = (float)combo / totalChars;
+        float ratio = totalChars > 0 ? (float)combo / totalChars : 0f;
         float variance = Random.Range(-damageVariance, damageVariance);
         int damage = Mathf.Max(0, Mathf.RoundToInt(50 * (ratio + variance)));
 
@@ -189,38 +223,10 @@ SEManager.Instance.Play(combo > 0 ? "attack" : "miss");
 if (enemyObject != null)
             Shaker.Instance.Shake(enemyObject.transform, 0.25f, 0.3f);   // ★敵を揺らす
 
-
-
-
-
-
-        // TODO: 敵を揺らす（次ステップ）
-
         yield return new WaitForSeconds(afterAttackWait);
 
         if (enemyHP <= 0) { StartCoroutine(WinSequence()); yield break; }
-        StartCoroutine(EnemyTurnSequence());
-    }
-
-    IEnumerator EnemyTurnSequence()
-    {
-        State = BattleState.EnemyTurn;
-
-        float variance = Random.Range(-damageVariance, damageVariance);
-        int damage = Mathf.Max(0, Mathf.RoundToInt(enemyAttack * (1 + variance)));
-
-playerHP = Mathf.Max(0, playerHP - damage);
-PopupSpawner.Instance.SpawnDamage(damage, playerPopupPos);      // ★追加
-battleUI.UpdateHP(playerHP, playerMaxHP, enemyHP, enemyMaxHP);
-        // EnemyTurnSequence 内
-SEManager.Instance.Play("enemyAttack");
-        if (cameraTransform != null)
-            Shaker.Instance.Shake(cameraTransform, 0.3f, 0.4f);          // ★画面を揺らす
-
-        yield return new WaitForSeconds(afterAttackWait);
-
-        if (playerHP <= 0) { StartCoroutine(LoseSequence()); yield break; }
-        EnterCommand(); // ターン終了 → またコマンドへ
+        EnterCommand(); // 敵ターンは無し。コンボ分の攻撃を与えたら、また自分のコマンドへ
     }
 
     // ---------- 決着 ----------
