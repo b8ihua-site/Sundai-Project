@@ -14,6 +14,10 @@ public class PlayerAbilities : MonoBehaviour
     public int abilityThreshold = 5; // 3色すべてがこの値に達したらレベルアップ
     public int level = 1;
 
+    [Header("HP（フィールドとバトルで共有。レベルアップ時はここを増やす想定）")]
+    public int maxHP = 100;
+    public int currentHP = 100;
+
     void Awake()
     {
         if (Instance == null)

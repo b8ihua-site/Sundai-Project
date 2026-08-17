@@ -81,7 +81,17 @@ public Vector2 playerPopupPos = new Vector2(400f, 350f);
 
         battleUI.SetupCommandButtons(OnSelectFight, OnSelectItem, OnSelectRun);
 
-        playerHP = playerMaxHP;
+        // maxHPはPlayerAbilities（フィールドと共通）が本体。レベルアップ等での増加もここに反映される
+        if (PlayerAbilities.Instance != null)
+        {
+            playerMaxHP = PlayerAbilities.Instance.maxHP;
+            playerHP = Mathf.Clamp(PlayerAbilities.Instance.currentHP, 0, playerMaxHP);
+        }
+        else
+        {
+            playerHP = playerMaxHP;
+        }
+
         enemyHP = enemyMaxHP;
         battleUI.UpdateHP(playerHP, playerMaxHP, enemyHP, enemyMaxHP);
 
@@ -273,7 +283,10 @@ SEManager.Instance.Play("lose");
 
     void ReturnToMainScene()
     {
-        // TODO: ここでプレイヤーHPなどを持ち帰る処理（HP連動のとき）
+        // maxHPは共通なので、バトルのHPをそのままフィールド側へ書き戻す
+        if (PlayerAbilities.Instance != null)
+            PlayerAbilities.Instance.currentHP = Mathf.Clamp(playerHP, 0, PlayerAbilities.Instance.maxHP);
+
         if (battleBGM != null) MusicPlayer.Instance?.StopOverride();
         SceneManager.LoadScene(mainSceneName);
     }

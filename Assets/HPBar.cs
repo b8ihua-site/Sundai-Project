@@ -17,8 +17,20 @@ public class HPBar : MonoBehaviour
     public float delayTime = 0.5f;
     public float delaySpeed = 2f;
 
+    [Header("同期（フィールドの自機HPバーのみtrueにする）")]
+    public bool syncWithPlayerAbilities = false;
+
     float delayHP;
     float delayTimer;
+
+    void Awake()
+    {
+        if (syncWithPlayerAbilities && PlayerAbilities.Instance != null)
+        {
+            maxHP = PlayerAbilities.Instance.maxHP;
+            currentHP = PlayerAbilities.Instance.currentHP;
+        }
+    }
 
     void Start()
     {
@@ -58,10 +70,19 @@ public class HPBar : MonoBehaviour
     {
         currentHP = Mathf.Clamp(currentHP - amount, 0f, maxHP);
         delayTimer = 0f;
+        SyncOut();
     }
 
     public void Heal(float amount)
     {
         currentHP = Mathf.Clamp(currentHP + amount, 0f, maxHP);
+        SyncOut();
+    }
+
+    void SyncOut()
+    {
+        if (!syncWithPlayerAbilities || PlayerAbilities.Instance == null) return;
+        PlayerAbilities.Instance.maxHP = Mathf.RoundToInt(maxHP);
+        PlayerAbilities.Instance.currentHP = Mathf.RoundToInt(currentHP);
     }
 }

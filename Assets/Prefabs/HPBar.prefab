@@ -96,8 +96,8 @@ MonoBehaviour:
   barFill: {fileID: 8858445726107210901}
   barDelay: {fileID: 7242173862022194586}
   hpText: {fileID: 1413817921361071908}
-  maxHP: 300
-  currentHP: 300
+  maxHP: 100
+  currentHP: 100
   delayTime: 0.5
   delaySpeed: 2
 --- !u!1 &3033513087600116146

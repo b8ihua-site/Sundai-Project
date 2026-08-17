@@ -14219,7 +14219,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DamageCube
   hpBar: {fileID: 1595786702}
-  damage: 10
+  damage: 3.3
   interval: 1
 --- !u!65 &1432169342
 BoxCollider:
@@ -22362,6 +22362,10 @@ PrefabInstance:
     - target: {fileID: 1544052477831316124, guid: 63b1b116925a91b46ab4ed4540efc4fc, type: 3}
       propertyPath: m_Name
       value: HPBar
+      objectReference: {fileID: 0}
+    - target: {fileID: 8715097353830767402, guid: 63b1b116925a91b46ab4ed4540efc4fc, type: 3}
+      propertyPath: syncWithPlayerAbilities
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
