@@ -47,6 +47,11 @@ public class MusicPlayerUI : MonoBehaviour
         Instance = this;
     }
 
+    void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
     void Start()
     {
         musicPlayerPanel.SetActive(false);

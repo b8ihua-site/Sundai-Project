@@ -20,6 +20,10 @@ public class PopupSpawner : MonoBehaviour
     public Color comboColor = new Color(0.4f, 0.9f, 1f);
     public float comboFontSize = 28f;
 
+    [Header("回復")]
+    public Color healColor = new Color(0.6f, 0.9f, 0.25f);
+    public float healFontSize = 32f;
+
     void Awake()
     {
         if (Instance == null) Instance = this;
@@ -46,4 +50,7 @@ public class PopupSpawner : MonoBehaviour
 
     public void SpawnCombo(int combo, Vector2 screenPos)
         => Spawn($"COMBO {combo}!", comboColor, screenPos, comboFontSize);
+
+    public void SpawnHeal(int amount, Vector2 screenPos)
+        => Spawn($"+{amount}", healColor, screenPos, healFontSize);
 }

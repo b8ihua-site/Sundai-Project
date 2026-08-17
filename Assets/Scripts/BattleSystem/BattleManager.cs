@@ -39,6 +39,9 @@ public Vector2 playerPopupPos = new Vector2(400f, 350f);
     [Header("シーン")]
     public string mainSceneName = "MainScene";
 
+    [Header("BGM")]
+    public AudioClip battleBGM;
+
     [Header("参照")]
     public QuizDatabase quizDatabase;
     public BattleUI battleUI;
@@ -88,7 +91,10 @@ public Vector2 playerPopupPos = new Vector2(400f, 350f);
         {
             dodgeArena.OnWrongHit += HandleWrongHit;
             dodgeArena.OnTurnEnd += HandleDodgeFinished;
+            dodgeArena.OnHeal += HandleHeal;
         }
+
+        if (battleBGM != null) MusicPlayer.Instance?.PlayOverride(battleBGM);
 
         StartCoroutine(IntroSequence());
     }
@@ -174,6 +180,17 @@ SEManager.Instance.Play("question");
         dodgeArena.StartRound(currentQuestion.answer);
     }
 
+    // DodgeArenaから呼ばれる：回復弾（正解の文字の中に低確率で出る）に当たった
+    void HandleHeal()
+    {
+        int healAmount = Mathf.Max(1, Mathf.RoundToInt(playerMaxHP * 0.1f));
+        playerHP = Mathf.Min(playerMaxHP, playerHP + healAmount);
+        battleUI.UpdateHP(playerHP, playerMaxHP, enemyHP, enemyMaxHP);
+
+        if (PopupSpawner.Instance != null)
+            PopupSpawner.Instance.SpawnHeal(healAmount, playerPopupPos);
+    }
+
     // DodgeArenaから呼ばれる：順番違い／おとりに被弾した
     void HandleWrongHit()
     {
@@ -257,6 +274,7 @@ SEManager.Instance.Play("lose");
     void ReturnToMainScene()
     {
         // TODO: ここでプレイヤーHPなどを持ち帰る処理（HP連動のとき）
+        if (battleBGM != null) MusicPlayer.Instance?.StopOverride();
         SceneManager.LoadScene(mainSceneName);
     }
 

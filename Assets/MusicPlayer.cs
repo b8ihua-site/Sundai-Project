@@ -35,6 +35,9 @@ public class MusicPlayer : MonoBehaviour
 
 private bool isWaiting = true; // ★追加
 private bool isPaused = false;
+private bool isOverridden = false; // バトルBGM等で通常プレイリストを一時退避中か
+private AudioClip savedClip;
+private float savedTime;
 
 void Start()
 {
@@ -53,6 +56,7 @@ void Update()
 {
     if (isWaiting) return; // ★待機中は何もしない
     if (isPaused) return; // 一時停止中は自動送りしない
+    if (isOverridden) return; // バトルBGM再生中は通常プレイリストを進めない
 
     if (!audioSource.isPlaying && tracks.Length > 0)
     {
@@ -162,4 +166,43 @@ void Update()
     }
 
     public AudioClip GetCurrentClip() => tracks.Length > 0 ? tracks[CurrentTrackIndex] : null;
+
+    // 通常のプレイリスト再生を一時退避して、指定した曲をループ再生する（バトルBGM等）
+    public void PlayOverride(AudioClip clip, bool loop = true)
+    {
+        if (clip == null) return;
+
+        if (!isOverridden)
+        {
+            savedClip = audioSource.clip;
+            savedTime = audioSource.time;
+        }
+
+        isOverridden = true;
+        audioSource.loop = loop;
+        audioSource.clip = clip;
+        audioSource.Play();
+        MusicPlayerUI.Instance?.UpdateUI();
+    }
+
+    // PlayOverride前の状態に戻して、通常のプレイリスト再生を再開する
+    public void StopOverride()
+    {
+        if (!isOverridden) return;
+        isOverridden = false;
+        audioSource.loop = repeat;
+
+        if (savedClip != null)
+        {
+            audioSource.clip = savedClip;
+            audioSource.time = savedTime;
+            audioSource.Play();
+        }
+        else
+        {
+            PlayCurrent();
+        }
+
+        MusicPlayerUI.Instance?.UpdateUI();
+    }
 }
