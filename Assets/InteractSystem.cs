@@ -52,7 +52,9 @@ public AudioClip interactSE;
 {
     currentTarget = obj;
 
-    if (obj.isNPC)
+    if (obj.isShop)
+        inspectUI.ShowHintText("購入");
+    else if (obj.isNPC)
         inspectUI.ShowHintText("話す");
     else
         inspectUI.ShowHintText("調べる");
@@ -90,6 +92,21 @@ void OnPressF()
             });
             return; // 通常のテキスト表示はしない
         }
+
+        // ★ お店（自販機など）用分岐
+        if (currentTarget.isShop)
+        {
+            inspectUI.ShowHint(false);
+            LockPlayer(true);
+            ShopUI.Instance.Show(currentTarget.shopItemIds, () =>
+            {
+                LockPlayer(false);
+                if (currentTarget != null)
+                    inspectUI.ShowHintText("購入");
+            });
+            return; // 通常のテキスト表示はしない
+        }
+
         isReading = true;
         inspectUI.ShowHint(false);
         inspectUI.StartReading(

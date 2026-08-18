@@ -13,6 +13,8 @@ public class KnowledgeWind : MonoBehaviour, IPhotographable
     public string enemyName = "知識の風"; // 「〇〇の風」の形を想定（構え中の名前表示にも使う）
     public int enemyMaxHP = 80;
     public int enemyAttack = 15;
+    public int moneyRewardMin = 10;
+    public int moneyRewardMax = 20;
 
     [Header("見た目（パーティクルのみ）")]
     public float visualScale = 0.8f;
@@ -120,7 +122,11 @@ public class KnowledgeWind : MonoBehaviour, IPhotographable
         BattleContext.EnemyAttack= enemyAttack;
         BattleContext.Subject    = subjectName;
         BattleContext.WindColor  = color.ToString();
+        BattleContext.MoneyMin   = moneyRewardMin;
+        BattleContext.MoneyMax   = moneyRewardMax;
+        BattleContext.EnemyLevel = PlayerAbilities.Instance != null ? PlayerAbilities.Instance.level : 1;
 
+        PlayerAbilities.CaptureFieldPosition();
         SceneManager.LoadScene(battleSceneName);
     }
 

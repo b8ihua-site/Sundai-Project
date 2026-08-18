@@ -11,6 +11,7 @@ public class MusicPlayer : MonoBehaviour
     [Header("設定")]
     public bool shuffle = true;
     public bool repeat = false;
+    [Range(0f, 1f)] public float volume = 1f;
 
     private AudioSource audioSource;
     private List<int> playOrder = new List<int>();
@@ -31,6 +32,17 @@ public class MusicPlayer : MonoBehaviour
         }
 
         audioSource = GetComponent<AudioSource>();
+
+        volume = PlayerPrefs.GetFloat("BgmVolume", 1f);
+        audioSource.volume = volume;
+    }
+
+    // メニューの設定画面から呼ばれる
+    public void SetVolume(float v)
+    {
+        volume = Mathf.Clamp01(v);
+        audioSource.volume = volume;
+        PlayerPrefs.SetFloat("BgmVolume", volume);
     }
 
 private bool isWaiting = true; // ★追加
@@ -124,6 +136,27 @@ void Update()
         audioSource.Pause();
         isPaused = true;
         MusicPlayerUI.Instance?.UpdateUI();
+    }
+
+    // 音量を0までフェードしてから一時停止する（タイトルに戻る時など、唐突に切れないようにする用）
+    public void FadeOutAndPause(float duration)
+    {
+        StartCoroutine(FadeOutAndPauseCoroutine(duration));
+    }
+
+    System.Collections.IEnumerator FadeOutAndPauseCoroutine(float duration)
+    {
+        float startVolume = audioSource.volume;
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            audioSource.volume = Mathf.Lerp(startVolume, 0f, t / duration);
+            yield return null;
+        }
+
+        Pause();
+        audioSource.volume = volume; // 設定音量に戻しておく（次に再生する時のため）
     }
 
     public void Next()

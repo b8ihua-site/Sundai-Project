@@ -45,6 +45,10 @@ public class CameraAimSystem : MonoBehaviour
 
         if (crosshair != null)
             crosshair.SetActive(false);
+
+        // 戦闘から戻った直後などにuiRootが非表示のまま残らないよう、シーン開始時は必ず表示状態にする
+        if (uiRoot != null)
+            uiRoot.SetActive(true);
     }
 
     void Update()

@@ -8,6 +8,8 @@ public class EnemyEncounter : MonoBehaviour
     public string enemyName = "なぞの敵";   // 表示名「○○が現れた！」
     public int enemyMaxHP = 100;
     public int enemyAttack = 20;
+    public int moneyRewardMin = 10;
+    public int moneyRewardMax = 20;
     public float encounterRange = 3f;
 
     [Header("シーン")]
@@ -37,7 +39,11 @@ public class EnemyEncounter : MonoBehaviour
             BattleContext.EnemyAttack= enemyAttack;
             BattleContext.Subject    = subjectName;
             BattleContext.WindColor  = "";
+            BattleContext.MoneyMin   = moneyRewardMin;
+            BattleContext.MoneyMax   = moneyRewardMax;
+            BattleContext.EnemyLevel = PlayerAbilities.Instance != null ? PlayerAbilities.Instance.level : 1;
 
+            PlayerAbilities.CaptureFieldPosition();
             SceneManager.LoadScene(battleSceneName);
         }
     }

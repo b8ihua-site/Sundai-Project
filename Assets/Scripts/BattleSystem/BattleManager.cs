@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine.SceneManagement;
 
 public class BattleManager : MonoBehaviour
@@ -18,6 +19,9 @@ public class BattleManager : MonoBehaviour
     public int enemyMaxHP = 100;
     public int enemyAttack = 20;
     public float damageVariance = 0.05f;
+    public int moneyMin = 10;
+    public int moneyMax = 20;
+    private int enemyLevel = 1;
 
     [Header("敵オブジェクト（背景の3D。Cube等。任意）")]
     public GameObject enemyObject;
@@ -74,6 +78,9 @@ public Vector2 playerPopupPos = new Vector2(400f, 350f);
             enemyAttack = BattleContext.EnemyAttack;
             subject     = BattleContext.Subject;
             windColor   = BattleContext.WindColor;
+            moneyMin    = BattleContext.MoneyMin;
+            moneyMax    = BattleContext.MoneyMax;
+            enemyLevel  = BattleContext.EnemyLevel;
 
             BattleContext.HasData = false;
             BattleContext.WindColor = "";
@@ -147,13 +154,76 @@ SEManager.Instance.Play("select");
     void OnSelectItem()
     {
         if (State != BattleState.Command) return;
-        StartCoroutine(ItemPlaceholder()); // 今は未実装
+        StartCoroutine(ItemSequence());
     }
 
-    IEnumerator ItemPlaceholder()
+    IEnumerator ItemSequence()
     {
         battleUI.ShowCommandPanel(false);
-        battleUI.ShowMessage("もちものは まだ ない！");
+
+        var pa = PlayerAbilities.Instance;
+        var db = ItemDatabase.Instance;
+
+        var usable = new List<PlayerAbilities.InventoryEntry>();
+        if (pa != null && db != null)
+        {
+            foreach (var entry in pa.inventory)
+            {
+                var def = db.Find(entry.itemId);
+                if (def != null && def.healAmount > 0 && entry.count > 0)
+                    usable.Add(entry);
+            }
+        }
+
+        if (usable.Count == 0)
+        {
+            battleUI.ShowMessage("つかえる どうぐが ない！");
+            yield return new WaitForSeconds(1.0f);
+            EnterCommand();
+            yield break;
+        }
+
+        string list = "どうぐを えらんで数字キー（もどるのはBackspace）\n";
+        for (int i = 0; i < usable.Count && i < 9; i++)
+        {
+            var def = db.Find(usable[i].itemId);
+            list += $"{i + 1}: {def.displayName} HP+{def.healAmount} (のこり{usable[i].count})\n";
+        }
+        battleUI.ShowMessage(list);
+
+        int chosen = -1;
+        while (chosen < 0)
+        {
+            if (Input.GetKeyDown(KeyCode.Backspace) || Input.GetKeyDown(KeyCode.Escape))
+            {
+                EnterCommand();
+                yield break;
+            }
+
+            for (int i = 0; i < usable.Count && i < 9; i++)
+            {
+                if (Input.GetKeyDown(KeyCode.Alpha1 + i) || Input.GetKeyDown(KeyCode.Keypad1 + i))
+                {
+                    chosen = i;
+                    break;
+                }
+            }
+
+            yield return null;
+        }
+
+        var chosenEntry = usable[chosen];
+        var chosenDef = db.Find(chosenEntry.itemId);
+        pa.ConsumeItem(chosenEntry.itemId);
+
+        playerHP = Mathf.Clamp(playerHP + chosenDef.healAmount, 0, playerMaxHP);
+        battleUI.UpdateHP(playerHP, playerMaxHP, enemyHP, enemyMaxHP);
+        battleUI.ShowMessage($"{chosenDef.displayName}を つかった！");
+
+        if (SEManager.Instance != null) SEManager.Instance.Play("select");
+        if (PopupSpawner.Instance != null)
+            PopupSpawner.Instance.SpawnHeal(chosenDef.healAmount, playerPopupPos);
+
         yield return new WaitForSeconds(1.0f);
         EnterCommand();
     }
@@ -267,6 +337,10 @@ SEManager.Instance.Play("win");
         if (!string.IsNullOrEmpty(windColor) && PlayerAbilities.Instance != null)
             PlayerAbilities.Instance.AddAbility(windColor);
 
+        int reward = Random.Range(moneyMin, moneyMax + 1) * Mathf.Max(1, enemyLevel);
+        if (PlayerAbilities.Instance != null) PlayerAbilities.Instance.AddMoney(reward);
+        if (PopupSpawner.Instance != null) PopupSpawner.Instance.SpawnMoney(reward, enemyPopupPos);
+
         yield return new WaitForSeconds(resultWait);
         ReturnToMainScene();
     }
@@ -277,8 +351,13 @@ SEManager.Instance.Play("win");
         battleUI.ShowResult(false);
         // LoseSequence 内
 SEManager.Instance.Play("lose");
+
+        // 敗北してもゲームオーバーにはせず、HPを半分回復して復活させる
+        playerHP = Mathf.Max(1, playerMaxHP / 2);
+        battleUI.UpdateHP(playerHP, playerMaxHP, enemyHP, enemyMaxHP);
+
         yield return new WaitForSeconds(resultWait);
-        ReturnToMainScene(); // とりあえずMainSceneへ（負け時の扱いは要相談）
+        ReturnToMainScene();
     }
 
     void ReturnToMainScene()
@@ -288,6 +367,7 @@ SEManager.Instance.Play("lose");
             PlayerAbilities.Instance.currentHP = Mathf.Clamp(playerHP, 0, PlayerAbilities.Instance.maxHP);
 
         if (battleBGM != null) MusicPlayer.Instance?.StopOverride();
+        PlayerAbilities.RestoreFieldPositionOnReturn();
         SceneManager.LoadScene(mainSceneName);
     }
 

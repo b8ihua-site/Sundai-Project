@@ -20,6 +20,9 @@ public class SEManager : MonoBehaviour
     public AudioClip scaleClip;                 // ドの音1個。短い単音(ベル/マリンバ等)推奨
     [Range(0f, 1f)] public float scaleVolume = 1f;
 
+    [Header("設定")]
+    [Range(0f, 1f)] public float masterVolume = 1f;
+
     private AudioSource source;       // 通常SE用
     private AudioSource pitchSource;  // 音階用（ピッチを変える）
     private Dictionary<string, SE> dict = new Dictionary<string, SE>();
@@ -41,13 +44,22 @@ public class SEManager : MonoBehaviour
         foreach (var se in seList)
             if (se != null && !string.IsNullOrEmpty(se.key) && !dict.ContainsKey(se.key))
                 dict.Add(se.key, se);
+
+        masterVolume = PlayerPrefs.GetFloat("SeVolume", 1f);
+    }
+
+    // メニューの設定画面から呼ばれる
+    public void SetVolume(float v)
+    {
+        masterVolume = Mathf.Clamp01(v);
+        PlayerPrefs.SetFloat("SeVolume", masterVolume);
     }
 
     // 通常SE
     public void Play(string key)
     {
         if (dict.TryGetValue(key, out var se) && se.clip != null)
-            source.PlayOneShot(se.clip, se.volume);
+            source.PlayOneShot(se.clip, se.volume * masterVolume);
         else
             Debug.LogWarning($"SE '{key}' が見つかりません");
     }
@@ -69,6 +81,6 @@ public class SEManager : MonoBehaviour
         semitone = Mathf.Min(semitone, 24);
 
         pitchSource.pitch = Mathf.Pow(2f, semitone / 12f);
-        pitchSource.PlayOneShot(scaleClip, scaleVolume);
+        pitchSource.PlayOneShot(scaleClip, scaleVolume * masterVolume);
     }
 }

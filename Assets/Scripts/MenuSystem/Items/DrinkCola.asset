@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1d2e3f4a5b6178294a3b4c5d6e7f801, type: 3}
+  m_Name: DrinkCola
+  m_EditorClassIdentifier: Assembly-CSharp::ItemDefinition
+  itemId: drink_cola
+  displayName: "スンダイコーラ"
+  description: "「第一脂肪は譲れない」でお馴染み、スンダイ印のコーラ。爽やかな喉越しで、甘くないのが特徴。"
+  icon: {fileID: 21300000, guid: a7eb5b2c3809c2c408ff2d353b43db9d, type: 3}
+  price: 50
+  healAmount: 20

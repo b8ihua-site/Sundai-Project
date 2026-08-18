@@ -16,4 +16,10 @@ public class InteractableObject : MonoBehaviour
     public int enemyMaxHP = 100;
     public int enemyAttack = 20;
     public string subject = "市ヶ谷";
+    public int moneyRewardMin = 10;
+    public int moneyRewardMax = 20;
+
+    [Header("お店設定（自販機など）")]
+    public bool isShop = false;                 // これをONにすると購入UIが出る
+    public string[] shopItemIds;                // ItemDatabase内のitemIdを指定
 }

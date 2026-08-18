@@ -99,8 +99,12 @@ public class BattleChoiceUI : MonoBehaviour
         BattleContext.EnemyAttack = currentEnemy.enemyAttack;
         BattleContext.Subject     = currentEnemy.subject;
         BattleContext.WindColor   = "";
+        BattleContext.MoneyMin    = currentEnemy.moneyRewardMin;
+        BattleContext.MoneyMax    = currentEnemy.moneyRewardMax;
+        BattleContext.EnemyLevel  = PlayerAbilities.Instance != null ? PlayerAbilities.Instance.level : 1;
 
         Hide();
+        PlayerAbilities.CaptureFieldPosition();
         SceneManager.LoadScene(battleSceneName);
     }
 

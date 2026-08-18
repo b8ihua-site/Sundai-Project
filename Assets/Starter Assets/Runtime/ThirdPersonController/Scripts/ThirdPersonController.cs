@@ -80,6 +80,14 @@ namespace StarterAssets
         private float _cinemachineTargetYaw;
         private float _cinemachineTargetPitch;
 
+        // セーブデータ復元用。CameraRotation()が毎フレームCinemachineCameraTargetの回転を
+        // この2値から再計算するため、外部からはTransformでなくここを直接書き換える必要がある
+        public void SetLookAngles(float yaw, float pitch)
+        {
+            _cinemachineTargetYaw = yaw;
+            _cinemachineTargetPitch = pitch;
+        }
+
         // player
         private float _speed;
         private float _animationBlend;

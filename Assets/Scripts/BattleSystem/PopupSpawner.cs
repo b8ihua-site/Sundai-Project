@@ -24,6 +24,10 @@ public class PopupSpawner : MonoBehaviour
     public Color healColor = new Color(0.6f, 0.9f, 0.25f);
     public float healFontSize = 32f;
 
+    [Header("獲得金額")]
+    public Color moneyColor = new Color(1f, 0.85f, 0.2f);
+    public float moneyFontSize = 28f;
+
     void Awake()
     {
         if (Instance == null) Instance = this;
@@ -53,4 +57,7 @@ public class PopupSpawner : MonoBehaviour
 
     public void SpawnHeal(int amount, Vector2 screenPos)
         => Spawn($"+{amount}", healColor, screenPos, healFontSize);
+
+    public void SpawnMoney(int amount, Vector2 screenPos)
+        => Spawn($"+{amount}えん", moneyColor, screenPos, moneyFontSize);
 }
