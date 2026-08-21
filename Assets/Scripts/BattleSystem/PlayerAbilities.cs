@@ -24,7 +24,7 @@ public class PlayerAbilities : MonoBehaviour
     public int currentHP = 100;
 
     [Header("お金")]
-    public int money = 0;
+    public int money = 1000; // 初期所持金
 
     [Header("図鑑（倒した知識の風の数）")]
     public int mathDefeats = 0;
@@ -72,6 +72,20 @@ public class PlayerAbilities : MonoBehaviour
             Destroy(gameObject);
         }
     }
+
+#if UNITY_EDITOR
+    // デバッグ用：F9で3科目それぞれ知識の風を1体倒した判定にする。動作確認が終わったら削除すること
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.F9))
+        {
+            AddAbility("Blue");
+            AddAbility("Green");
+            AddAbility("Red");
+            Debug.Log("[Debug] 3科目をそれぞれ1体分加算しました");
+        }
+    }
+#endif
 
     // PlayerAbilitiesはDontDestroyOnLoadでStart()が最初の1回しか呼ばれないため、
     // 戦闘から戻るたびの位置復元にはsceneLoadedを使う
@@ -151,13 +165,15 @@ public class PlayerAbilities : MonoBehaviour
             mathPower -= abilityThreshold;
             sciencePower -= abilityThreshold;
             ichigayaPower -= abilityThreshold;
+
+            int previousLevel = level;
             level++;
 
             maxHP += hpPerLevel;
             currentHP = Mathf.Min(maxHP, currentHP + hpPerLevel);
 
-            // TODO: レベルアップ演出・通知UIは今後
             Debug.Log("レベルアップ！ Lv." + level);
+            MenuController.Instance?.QueueLevelUp(previousLevel, level);
         }
     }
 

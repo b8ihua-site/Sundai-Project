@@ -159,6 +159,28 @@ void Update()
         audioSource.volume = volume; // 設定音量に戻しておく（次に再生する時のため）
     }
 
+    // 一時停止していた位置から再開しつつ、音量を0から設定音量までフェードする
+    public void FadeInAndResume(float duration)
+    {
+        StartCoroutine(FadeInAndResumeCoroutine(duration));
+    }
+
+    System.Collections.IEnumerator FadeInAndResumeCoroutine(float duration)
+    {
+        audioSource.volume = 0f;
+        Play(); // Pause()した位置から再開する
+
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            audioSource.volume = Mathf.Lerp(0f, volume, t / duration);
+            yield return null;
+        }
+
+        audioSource.volume = volume;
+    }
+
     public void Next()
     {
         currentOrderIndex = (currentOrderIndex + 1) % playOrder.Count;

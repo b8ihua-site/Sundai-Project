@@ -41,6 +41,18 @@ public class MenuController : MonoBehaviour
     RectTransform panelRect;
     Coroutine animCoroutine;
 
+    // 月が変わった時の全画面演出（Tabメニューの開閉状態やシーンに関係なく表示できるよう別Canvasにする）
+    GameObject monthChangeRoot;
+    CanvasGroup monthChangeGroup;
+    Image monthChangeNewPage; // 下敷き：次の月のページ（動かない）
+    Image monthChangeOldPage; // 上：今の月のページ（ここだけ「ビリッ」と破って落とす）
+    TextMeshProUGUI monthChangeOldText;
+    TextMeshProUGUI monthChangeNewText;
+    Coroutine monthChangeCoroutine;
+    bool pendingLevelUp; // 戦闘中のレベルアップはmainsceneに戻るまで演出を保留する
+    int pendingLevelUpFrom;
+    int pendingLevelUpTo;
+
     // 左側：角丸ボタン
     readonly List<Image> gridButtons = new List<Image>();
     readonly List<string> gridLabels = new List<string> { "もちもの", "日記", "設定", "図鑑", "タイトルへ", "とじる" };
@@ -93,6 +105,7 @@ public class MenuController : MonoBehaviour
     static readonly Color TextDark = new Color(0.16f, 0.16f, 0.18f, 1f);  // 明るい背景の上に置く文字色
     static readonly Color TextLight = Color.white;                        // 暗い背景（ボタン・持ち物パネル）の上に置く文字色
     static readonly Color MoneyBadgeColor = new Color(0.3f, 0.3f, 0.33f, 0.92f); // お金バッジのグレー（独立表示なので他より少し濃くする）
+    static readonly Color MonthPageColor = new Color(0.98f, 0.96f, 0.9f, 1f); // 日めくりカレンダーの紙の色（クリーム色）
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Bootstrap()
@@ -115,7 +128,7 @@ public class MenuController : MonoBehaviour
             return;
         }
 
-        font = Resources.Load<TMP_FontAsset>("瀞ノグリッチ黒体H2 SDF"); // 試しにフォントを変更中
+        font = Resources.Load<TMP_FontAsset>("GenEiKiwamiGo SDF");
         menuBgSprite = Resources.Load<Sprite>("menu_bg");
 
         gridIconSprites = new Sprite[gridIconNames.Count];
@@ -130,9 +143,19 @@ public class MenuController : MonoBehaviour
         canvasRoot.SetActive(false);
         canvasGroup.alpha = 0f;
 
+        BuildMonthChangeOverlay();
+        monthChangeRoot.SetActive(false);
+
         SceneManager.sceneLoaded += (scene, mode2) =>
         {
             if (isOpen) SetOpen(false); // シーン遷移中に開きっぱなしにならないようにする
+
+            // 戦闘中にレベルアップしても、mainsceneに戻ってくるまで演出はお預けにする
+            if (pendingLevelUp && scene.name == MainSceneName)
+            {
+                pendingLevelUp = false;
+                NotifyLevelUp(pendingLevelUpFrom, pendingLevelUpTo);
+            }
         };
     }
 
@@ -494,12 +517,32 @@ public class MenuController : MonoBehaviour
 
     // ---------- 表示更新 ----------
 
+    // レベル表示は「浪人」テーマで月日に見立てる。Lv.1=4月始まり、達成度に応じて日を進める
+    static readonly int[] DaysInMonth = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }; // 1月始まり
+
+    // Lv.1→4月、Lv.9→12月、Lv.10→1月、Lv.12→3月…と巡回
+    static int LevelToMonth(int level) => ((level - 1 + 3) % 12) + 1;
+
+    // ClockSystemなど、メニュー外からも同じ日付表記を使えるようpublicにしている
+    public static string FormatRoninDate(PlayerAbilities pa)
+    {
+        if (pa == null) return "";
+
+        int month = LevelToMonth(pa.level);
+        int daysInMonth = DaysInMonth[month - 1];
+
+        float progress = Mathf.Clamp01((pa.mathPower + pa.sciencePower + pa.ichigayaPower) / (3f * pa.abilityThreshold));
+        int day = Mathf.Clamp(1 + Mathf.RoundToInt(progress * (daysInMonth - 1)), 1, daysInMonth);
+
+        return $"{month}月{day}日";
+    }
+
     void RefreshPlayerInfo()
     {
         var pa = PlayerAbilities.Instance;
         if (pa == null) return;
 
-        levelText.text = $"Lv. {pa.level}";
+        levelText.text = FormatRoninDate(pa);
         hpText.text = $"HP {pa.currentHP} / {pa.maxHP}";
         moneyText.text = $"{pa.money}";
 
@@ -510,6 +553,159 @@ public class MenuController : MonoBehaviour
         mathCountText.text     = $"{pa.mathPower}/{pa.abilityThreshold}";
         scienceCountText.text  = $"{pa.sciencePower}/{pa.abilityThreshold}";
         ichigayaCountText.text = $"{pa.ichigayaPower}/{pa.abilityThreshold}";
+    }
+
+    // ---------- 月が変わった時の全画面演出 ----------
+
+    // PlayerAbilities.CheckLevelUp()から呼ばれる。戦闘中（mainscene以外）なら演出を保留し、
+    // mainsceneに戻ってきたタイミング（SceneManager.sceneLoaded）で実際に再生する
+    public void QueueLevelUp(int previousLevel, int newLevel)
+    {
+        if (SceneManager.GetActiveScene().name == MainSceneName)
+        {
+            NotifyLevelUp(previousLevel, newLevel);
+            return;
+        }
+
+        if (!pendingLevelUp)
+        {
+            pendingLevelUp = true;
+            pendingLevelUpFrom = previousLevel;
+        }
+        pendingLevelUpTo = newLevel; // 保留中に複数回レベルアップしても最終結果だけ見せる
+    }
+
+    void NotifyLevelUp(int previousLevel, int newLevel)
+    {
+        int fromMonth = LevelToMonth(previousLevel);
+        int toMonth = LevelToMonth(newLevel);
+        if (fromMonth == toMonth) return;
+
+        if (monthChangeCoroutine != null) StopCoroutine(monthChangeCoroutine);
+        monthChangeCoroutine = StartCoroutine(MonthChangeCoroutine(fromMonth, toMonth));
+    }
+
+    static readonly Vector2 MonthPageTopAnchoredPos = new Vector2(0f, 120f); // pivotを上端(0.5,1)にした状態での「元の位置」
+
+    // 日めくりカレンダー演出：今の月のページが上端を軸に「ビリッ」と破れて落ち、
+    // 下に貼ってあった次の月のページが現れる
+    IEnumerator MonthChangeCoroutine(int fromMonth, int toMonth)
+    {
+        monthChangeRoot.SetActive(true);
+        monthChangeGroup.alpha = 1f;
+
+        monthChangeNewText.text = $"{toMonth}";
+        monthChangeOldText.text = $"{fromMonth}";
+
+        var oldRect = monthChangeOldPage.rectTransform;
+        oldRect.anchoredPosition = MonthPageTopAnchoredPos;
+        oldRect.localEulerAngles = Vector3.zero;
+        oldRect.localScale = Vector3.one;
+        monthChangeOldPage.color = MonthPageColor;
+        monthChangeOldText.color = TextDark;
+        monthChangeOldPage.gameObject.SetActive(true);
+
+        yield return new WaitForSeconds(1.2f); // 次の月に変わる前に少し見せておく
+
+        // ちぎれる直前の小刻みな震え
+        const float shakeDuration = 0.3f;
+        float t = 0f;
+        while (t < shakeDuration)
+        {
+            t += Time.deltaTime;
+            float shake = Mathf.Sin(t * 60f) * 3f;
+            oldRect.anchoredPosition = MonthPageTopAnchoredPos + new Vector2(shake, 0f);
+            yield return null;
+        }
+
+        SpawnTearScraps();
+
+        // 上端を軸に回転しながら落ちて消える（破り取られた紙）
+        const float tearDuration = 1.0f;
+        Vector2 startPos = MonthPageTopAnchoredPos;
+        Vector2 endPos = MonthPageTopAnchoredPos + new Vector2(70f, -90f);
+        t = 0f;
+        while (t < tearDuration)
+        {
+            t += Time.deltaTime;
+            float p = Mathf.Clamp01(t / tearDuration);
+            float eased = p * p; // ease-in（だんだん加速して落ちる）
+            oldRect.anchoredPosition = Vector2.Lerp(startPos, endPos, eased);
+            oldRect.localEulerAngles = new Vector3(0f, 0f, Mathf.Lerp(0f, -35f, eased));
+            oldRect.localScale = Vector3.one * Mathf.Lerp(1f, 0.85f, eased);
+
+            float fadeP = Mathf.Clamp01((p - 0.4f) / 0.6f);
+            var pc = monthChangeOldPage.color; pc.a = Mathf.Lerp(1f, 0f, fadeP); monthChangeOldPage.color = pc;
+            var tc = monthChangeOldText.color; tc.a = pc.a; monthChangeOldText.color = tc;
+
+            yield return null;
+        }
+        monthChangeOldPage.gameObject.SetActive(false);
+
+        // 現れた次の月のページが小さく弾む
+        var newRect = monthChangeNewPage.rectTransform;
+        const float bounceDuration = 0.3f;
+        t = 0f;
+        while (t < bounceDuration)
+        {
+            t += Time.deltaTime;
+            float p = Mathf.Clamp01(t / bounceDuration);
+            float eased = 1f - Mathf.Pow(1f - p, 3f); // ease-out
+            newRect.localScale = Vector3.one * Mathf.Lerp(0.92f, 1f, eased);
+            yield return null;
+        }
+        newRect.localScale = Vector3.one;
+
+        yield return new WaitForSeconds(1.8f); // 新しい月をしばらく見せておく
+
+        // 全体をフェードアウトして閉じる
+        const float closeDuration = 0.5f;
+        t = 0f;
+        while (t < closeDuration)
+        {
+            t += Time.deltaTime;
+            monthChangeGroup.alpha = 1f - Mathf.Clamp01(t / closeDuration);
+            yield return null;
+        }
+
+        monthChangeRoot.SetActive(false);
+        monthChangeCoroutine = null;
+    }
+
+    // 破れた紙片が数枚飛び散る、ちぎれた瞬間だけの使い捨て演出
+    void SpawnTearScraps()
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            var scrap = CreateImage(monthChangeRoot.transform, MonthPageColor, MonthPageTopAnchoredPos, new Vector2(18f, 10f));
+            scrap.sprite = roundedSprite;
+            scrap.type = Image.Type.Sliced;
+            StartCoroutine(AnimateTearScrap(scrap, i));
+        }
+    }
+
+    IEnumerator AnimateTearScrap(Image scrap, int seed)
+    {
+        var rect = scrap.rectTransform;
+        float dirX = (seed % 2 == 0 ? 1f : -1f) * (30f + seed * 12f);
+        float dirY = (seed < 2 ? 1f : -1f) * (30f + seed * 10f);
+        float rot = (seed % 2 == 0 ? 1f : -1f) * 220f;
+
+        const float duration = 0.4f;
+        Vector2 end = MonthPageTopAnchoredPos + new Vector2(dirX, dirY);
+
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float p = Mathf.Clamp01(t / duration);
+            rect.anchoredPosition = Vector2.Lerp(MonthPageTopAnchoredPos, end, p);
+            rect.localEulerAngles = new Vector3(0f, 0f, rot * p);
+            var c = scrap.color; c.a = Mathf.Lerp(1f, 0f, p); scrap.color = c;
+            yield return null;
+        }
+
+        Destroy(scrap.gameObject);
     }
 
     void RefreshInventory()
@@ -556,6 +752,57 @@ public class MenuController : MonoBehaviour
     }
 
     // ---------- UI構築 ----------
+
+    void BuildMonthChangeOverlay()
+    {
+        // Tabメニューのcanvasrootとは別に、常に自分でON/OFFできる専用Canvasを持つ
+        // （canvasRootが非アクティブな間や戦闘中など、Tabメニューの開閉状態に関係なく再生したいため）
+        monthChangeRoot = new GameObject("MonthChangeCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
+        DontDestroyOnLoad(monthChangeRoot);
+
+        var canvas = monthChangeRoot.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 600; // 自販機UI(400)・Tabメニュー(500)より手前
+
+        var scaler = monthChangeRoot.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(800f, 600f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        monthChangeGroup = monthChangeRoot.AddComponent<CanvasGroup>();
+        monthChangeGroup.interactable = false;
+        monthChangeGroup.blocksRaycasts = false; // 演出中もゲーム操作をブロックしない
+
+        var dimRect = CreateImage(monthChangeRoot.transform, new Color(0f, 0f, 0f, 0.55f), Vector2.zero, Vector2.zero).rectTransform;
+        dimRect.anchorMin = Vector2.zero;
+        dimRect.anchorMax = Vector2.one;
+        dimRect.sizeDelta = Vector2.zero;
+
+        // 下敷き：次の月のページ（最初からここに貼ってあり、動かない）
+        monthChangeNewPage = CreateImage(monthChangeRoot.transform, MonthPageColor, Vector2.zero, new Vector2(240f, 240f));
+        monthChangeNewPage.sprite = roundedSprite;
+        monthChangeNewPage.type = Image.Type.Sliced;
+
+        CreateText(monthChangeNewPage.transform, "月", 26f, TextAlignmentOptions.Center,
+            new Vector2(0f, 76f), new Vector2(200f, 36f), TextDark);
+        monthChangeNewText = CreateText(monthChangeNewPage.transform, "", 100f, TextAlignmentOptions.Center,
+            new Vector2(0f, -16f), new Vector2(200f, 150f), TextDark);
+
+        // 上：今の月のページ。ここだけ上端を軸に回転させて「ちぎれて落ちる」動きをつける
+        monthChangeOldPage = CreateImage(monthChangeRoot.transform, MonthPageColor, MonthPageTopAnchoredPos, new Vector2(240f, 240f));
+        monthChangeOldPage.sprite = roundedSprite;
+        monthChangeOldPage.type = Image.Type.Sliced;
+        monthChangeOldPage.rectTransform.pivot = new Vector2(0.5f, 1f); // 上端＝とじ具の位置を軸にする
+
+        CreateText(monthChangeOldPage.transform, "月", 26f, TextAlignmentOptions.Center,
+            new Vector2(0f, 76f), new Vector2(200f, 36f), TextDark);
+        monthChangeOldText = CreateText(monthChangeOldPage.transform, "", 100f, TextAlignmentOptions.Center,
+            new Vector2(0f, -16f), new Vector2(200f, 150f), TextDark);
+
+        // とじ具（リング）っぽい飾り。ページの動きに関係なく常に同じ位置に表示しておく
+        var ring = CreateImage(monthChangeRoot.transform, new Color(0.25f, 0.25f, 0.27f, 1f), new Vector2(0f, 125f), new Vector2(24f, 24f));
+        ring.sprite = circleSprite;
+    }
 
     void BuildUI()
     {
@@ -755,7 +1002,7 @@ public class MenuController : MonoBehaviour
         cardImage.sprite = roundedSprite;
         cardImage.type = Image.Type.Sliced;
 
-        levelText = CreateText(card, "Lv. 1", 22f, TextAlignmentOptions.MidlineLeft,
+        levelText = CreateText(card, "4月01日", 22f, TextAlignmentOptions.MidlineLeft,
             new Vector2(-70f, 140f), new Vector2(200f, 30f), TextDark);
 
         hpText = CreateText(card, "HP 0 / 0", 18f, TextAlignmentOptions.MidlineLeft,
@@ -1008,7 +1255,8 @@ public class MenuController : MonoBehaviour
             SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
     }
 
-    Sprite CreateCircleSprite(int size = 128)
+    // 常在UI(ClockSystem)側でも同じ見た目の円状棒グラフを使えるようpublic staticにしている
+    public static Sprite CreateCircleSprite(int size = 128)
     {
         var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
         tex.filterMode = FilterMode.Bilinear;
@@ -1033,7 +1281,7 @@ public class MenuController : MonoBehaviour
     }
 
     // リング（ドーナツ状）のスプライトを生成する。Radial360フィルと組み合わせて円状の棒グラフに使う
-    Sprite CreateRingSprite(int size = 128, float thicknessRatio = 0.22f)
+    public static Sprite CreateRingSprite(int size = 128, float thicknessRatio = 0.22f)
     {
         var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
         tex.filterMode = FilterMode.Bilinear;

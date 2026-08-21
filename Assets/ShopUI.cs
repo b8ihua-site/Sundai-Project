@@ -12,16 +12,24 @@ public class ShopUI : MonoBehaviour
     public static ShopUI Instance;
 
     const float CardWidth = 160f;
-    const float CardHeight = 200f;
+    const float CardHeight = 240f; // アイコン+値段タグ+ボタンを縦に積むための高さ
     const float CardGap = 24f;
+    const float RowWidth = CardWidth * 3f + CardGap * 2f;
     const float TopMargin = 70f;
     const float DescGap = 22f;
     const float DescHeight = 100f;
 
     TMP_FontAsset font;
+    TMP_FontAsset descFont; // 説明帯（商品名・説明文）専用のフォント
     Sprite roundedSprite;
     Sprite leftRoundedSprite;
     Sprite glowSprite;
+    Sprite keyCapSprite; // キー案内バッジ用（既存の常駐UIのキーバッジと同じ、控えめな角丸四角）
+    Sprite jihankiOnSprite;  // 購入ボタン（選択中）
+    Sprite jihankiOffSprite; // 購入ボタン（通常）
+    Sprite jihankiBgSprite;  // ドリンクをまとめて囲う角丸フレームの背景
+    Sprite descUpperSprite;  // 説明帯：商品名の行の背景
+    Sprite descBottomSprite; // 説明帯：説明文の行の背景
 
     GameObject canvasRoot;
     CanvasGroup mainUiGroup; // カード・説明帯・お金バッジ・キー案内をまとめて持つ（入手演出中はこれごとフェードアウト）
@@ -30,6 +38,7 @@ public class ShopUI : MonoBehaviour
     TextMeshProUGUI statusText;
     TextMeshProUGUI descNameText;
     TextMeshProUGUI descBodyText;
+    Image descProductIcon;
 
     AudioSource audioSource;
     AudioClip buySE;   // 自販機の排出音
@@ -47,7 +56,7 @@ public class ShopUI : MonoBehaviour
     bool isRevealOpen;
 
     readonly List<string> itemIds = new List<string>();
-    readonly List<Image> cardFills = new List<Image>();
+    readonly List<Image> buyButtonImages = new List<Image>();
     int selectedIndex = 0;
 
     System.Action onClose;
@@ -55,9 +64,6 @@ public class ShopUI : MonoBehaviour
 
     static readonly Color TextDark = new Color(0.16f, 0.16f, 0.18f, 1f);  // 明るい面（お金アイコン等）の上の文字
     static readonly Color TextLight = new Color(0.96f, 0.96f, 0.97f, 1f); // 透明黒の面の上の文字
-    static readonly Color TextMuted = new Color(0.75f, 0.75f, 0.78f, 1f); // 透明黒の面の上の、控えめな文字（説明文など）
-    static readonly Color CardSelectedColor = new Color(0.25f, 0.42f, 0.8f, 0.65f); // 選択中カードの色味（説明帯と同じ透け方を保つため不透明度はCardColorに合わせる）
-    static readonly Color BuyButtonColor = new Color(0.4f, 0.62f, 0.95f, 1f);
     static readonly Color StatusColor = new Color(1f, 0.7f, 0.25f, 1f);
     static readonly Color CardColor = new Color(0.05f, 0.05f, 0.07f, 0.6f); // 透明黒
 
@@ -82,9 +88,16 @@ public class ShopUI : MonoBehaviour
             return;
         }
 
-        font = Resources.Load<TMP_FontAsset>("瀞ノグリッチ黒体H2 SDF");
+        font = Resources.Load<TMP_FontAsset>("GenEiKiwamiGo SDF");
+        descFont = Resources.Load<TMP_FontAsset>("GenEiLateMinP_v2 SDF");
         roundedSprite = CreateRoundedRectSprite();
         leftRoundedSprite = CreateLeftRoundedRectSprite(48, 16);
+        keyCapSprite = CreateRoundedRectSprite(32, 5);
+        jihankiOnSprite = Resources.Load<Sprite>("UI/jihanki_on");
+        jihankiOffSprite = Resources.Load<Sprite>("UI/jihanki_off");
+        jihankiBgSprite = Resources.Load<Sprite>("UI/jihanki_bg");
+        descUpperSprite = Resources.Load<Sprite>("UI/exp_bg_upper");
+        descBottomSprite = Resources.Load<Sprite>("UI/exp_bg_bottom");
         glowSprite = CreateGlowSprite();
 
         buySE = Resources.Load<AudioClip>("Se/zihanki_output2");
@@ -188,7 +201,7 @@ public class ShopUI : MonoBehaviour
     {
         for (int i = cardsRow.childCount - 1; i >= 0; i--)
             Destroy(cardsRow.GetChild(i).gameObject);
-        cardFills.Clear();
+        buyButtonImages.Clear();
         itemIds.Clear();
 
         var db = ItemDatabase.Instance;
@@ -201,26 +214,33 @@ public class ShopUI : MonoBehaviour
         if (itemIds.Count == 0)
         {
             CreateText(cardsRow, "（うっているものがありません）", 15f, TextAlignmentOptions.Center,
-                Vector2.zero, new Vector2(CardWidth * 3f + CardGap * 2f, 28f), TextLight);
+                Vector2.zero, new Vector2(RowWidth, 28f), TextLight);
             RefreshDescription();
             return;
         }
 
         float colPitch = CardWidth + CardGap;
 
+        // 購入ボタンをまとめて囲う白い角丸（3つ分をひとつの背景で覆う）
+        var buyAreaBg = CreateImage(cardsRow, Color.white, new Vector2(0f, -82f), new Vector2(RowWidth, 70f));
+        buyAreaBg.sprite = roundedSprite;
+        buyAreaBg.type = Image.Type.Sliced;
+
         for (int i = 0; i < itemIds.Count; i++)
         {
             var def = db.Find(itemIds[i]);
             float x = (i - (itemIds.Count - 1) / 2f) * colPitch;
 
-            // カード背景は説明帯と同じ単層の半透明にする（枠を裏に重ねると二重に暗くなって色がずれるため）
-            var fill = CreateImage(cardsRow, CardColor, new Vector2(x, 0f), new Vector2(CardWidth, CardHeight));
-            fill.sprite = roundedSprite;
-            fill.type = Image.Type.Sliced;
-            cardFills.Add(fill);
+            // 商品ごとの位置決め用のスロット（背景は持たない。3本まとめて角丸フレーム側の背景を使う）
+            var slotGO = new GameObject("DrinkSlot", typeof(RectTransform));
+            var slot = (RectTransform)slotGO.transform;
+            slot.SetParent(cardsRow, false);
+            slot.anchorMin = slot.anchorMax = new Vector2(0.5f, 0.5f);
+            slot.anchoredPosition = new Vector2(x, 0f);
+            slot.sizeDelta = new Vector2(CardWidth, CardHeight);
 
             // 商品画像（未設定なら仮のうっすらした枠。あとでアイコンを用意すればそのまま表示される）
-            var iconArea = CreateImage(fill.transform, new Color(1f, 1f, 1f, 0.12f), new Vector2(0f, 42f), new Vector2(130f, 108f));
+            var iconArea = CreateImage(slot, new Color(1f, 1f, 1f, 0.12f), new Vector2(0f, 58f), new Vector2(130f, 108f));
             iconArea.sprite = roundedSprite;
             iconArea.type = Image.Type.Sliced;
             if (def.icon != null)
@@ -231,19 +251,29 @@ public class ShopUI : MonoBehaviour
                 iconArea.preserveAspect = true;
             }
 
-            CreateText(fill.transform, $"¥{def.price}", 20f, TextAlignmentOptions.Center,
-                new Vector2(0f, -32f), new Vector2(CardWidth - 12f, 26f), TextLight);
+            // 値段タグ：冷たい飲み物の自販機によくある「水色の中に白いタグ」の見た目
+            var priceOuter = CreateImage(slot, new Color(6f / 255f, 127f / 255f, 215f / 255f, 1f), new Vector2(0f, -16f), new Vector2(120f, 30f));
+            priceOuter.sprite = roundedSprite;
+            priceOuter.type = Image.Type.Sliced;
 
-            var buyBorder = CreateImage(fill.transform, BuyButtonColor, new Vector2(0f, -72f), new Vector2(120f, 34f));
-            buyBorder.sprite = roundedSprite;
-            buyBorder.type = Image.Type.Sliced;
+            var priceInner = CreateImage(priceOuter.transform, Color.white, Vector2.zero, new Vector2(78f, 26f));
+            priceInner.sprite = roundedSprite;
+            priceInner.type = Image.Type.Sliced;
 
-            var buyButton = buyBorder.gameObject.AddComponent<Button>();
-            buyButton.targetGraphic = buyBorder;
+            CreateText(priceInner.transform, $"¥{def.price}", 17f, TextAlignmentOptions.Center,
+                Vector2.zero, new Vector2(78f, 26f), TextDark);
+
+            // 購入ボタン（背景は3つ共通のbuyAreaBgを使うので、ここではボタン画像だけ配置する）
+            var buyImage = CreateImage(slot, Color.white, new Vector2(0f, -82f), new Vector2(110f, 64f));
+            buyImage.sprite = jihankiOffSprite;
+            buyImage.type = Image.Type.Simple;
+            buyImage.preserveAspect = true;
+            buyButtonImages.Add(buyImage);
+
+            var buyButton = buyImage.gameObject.AddComponent<Button>();
+            buyButton.targetGraphic = buyImage;
             int index = i;
             buyButton.onClick.AddListener(() => { selectedIndex = index; HighlightAndDescribe(); BuyAt(index); });
-
-            CreateText(buyBorder.transform, "購入", 16f, TextAlignmentOptions.Center, Vector2.zero, new Vector2(120f, 34f), Color.white);
         }
 
         HighlightAndDescribe();
@@ -251,8 +281,9 @@ public class ShopUI : MonoBehaviour
 
     void HighlightAndDescribe()
     {
-        for (int i = 0; i < cardFills.Count; i++)
-            cardFills[i].color = (i == selectedIndex) ? CardSelectedColor : CardColor;
+        // カードの背景は選択状態に関わらず一律。どれを選んでいるかは購入ボタンのon/offだけで示す
+        for (int i = 0; i < buyButtonImages.Count; i++)
+            buyButtonImages[i].sprite = (i == selectedIndex) ? jihankiOnSprite : jihankiOffSprite;
 
         RefreshDescription();
     }
@@ -263,6 +294,7 @@ public class ShopUI : MonoBehaviour
         {
             descNameText.text = "";
             descBodyText.text = "";
+            descProductIcon.enabled = false;
             return;
         }
 
@@ -271,6 +303,9 @@ public class ShopUI : MonoBehaviour
 
         descNameText.text = def.displayName;
         descBodyText.text = def.description;
+
+        descProductIcon.enabled = def.icon != null;
+        descProductIcon.sprite = def.icon;
     }
 
     void BuyAt(int index)
@@ -317,6 +352,9 @@ public class ShopUI : MonoBehaviour
         // 通常のショップUIをフェードアウトさせつつ、入手演出をフェードインさせる
         FadeGroup(mainUiGroup, 0f, ref mainFadeCoroutine);
         FadeGroup(revealGroup, 1f, ref revealFadeCoroutine);
+
+        // 入手演出の間だけフィールドBGMを一時停止する
+        if (MusicPlayer.Instance != null) MusicPlayer.Instance.FadeOutAndPause(FadeDuration);
     }
 
     void CloseReveal()
@@ -331,6 +369,9 @@ public class ShopUI : MonoBehaviour
 
         FadeGroup(revealGroup, 0f, ref revealFadeCoroutine);
         FadeGroup(mainUiGroup, 1f, ref mainFadeCoroutine);
+
+        // フィールドBGMを途中から再開する
+        if (MusicPlayer.Instance != null) MusicPlayer.Instance.FadeInAndResume(FadeDuration);
     }
 
     void FadeGroup(CanvasGroup group, float target, ref Coroutine coroutineRef)
@@ -396,20 +437,26 @@ public class ShopUI : MonoBehaviour
         scaler.referenceResolution = new Vector2(800f, 600f);
         scaler.matchWidthOrHeight = 0.5f;
 
-        float rowWidth = CardWidth * 3f + CardGap * 2f;
+        const float DrinksPadding = 16f; // 角丸フレームの内側の余白
+        float drinksFrameWidth = RowWidth + DrinksPadding * 2f;
+        float drinksFrameHeight = CardHeight + DrinksPadding * 2f;
 
         // カード・説明帯・お金バッジ・キー案内をまとめるルート（入手演出中はこれごとフェードアウトする）
         var mainUiRoot = CreateRect(canvasRoot.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         mainUiGroup = mainUiRoot.gameObject.AddComponent<CanvasGroup>();
 
-        // 商品カードの行（画面上部中央）
-        cardsRow = CreateRect(mainUiRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(-rowWidth / 2f, -(TopMargin + CardHeight)), new Vector2(rowWidth / 2f, -TopMargin));
+        // 3本のドリンクをまとめて囲う角丸フレーム。背景はjihanki_bgをフレームいっぱいに引き伸ばして敷く
+        var drinksFrame = CreateRect(mainUiRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(-drinksFrameWidth / 2f, -(TopMargin + drinksFrameHeight)), new Vector2(drinksFrameWidth / 2f, -TopMargin));
+        BuildMaskedBg(drinksFrame, jihankiBgSprite);
+
+        // 商品カードの行（角丸フレームに重ねて表示する）
+        cardsRow = CreateRect(drinksFrame, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
         // 購入結果などの一時的なメッセージ（カード行と説明帯の間）
         var statusRect = CreateRect(mainUiRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(-rowWidth / 2f, -(TopMargin + CardHeight + DescGap / 2f) - 11f),
-            new Vector2(rowWidth / 2f, -(TopMargin + CardHeight + DescGap / 2f) + 11f));
+            new Vector2(-RowWidth / 2f, -(TopMargin + drinksFrameHeight + DescGap / 2f) - 11f),
+            new Vector2(RowWidth / 2f, -(TopMargin + drinksFrameHeight + DescGap / 2f) + 11f));
         statusText = statusRect.gameObject.AddComponent<TextMeshProUGUI>();
         if (font != null) statusText.font = font;
         statusText.fontSize = 14f;
@@ -417,32 +464,64 @@ public class ShopUI : MonoBehaviour
         statusText.color = StatusColor;
         statusText.raycastTarget = false;
 
-        // 説明帯（選択中の商品の名前と説明）
-        var descBand = CreateRect(mainUiRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(-rowWidth / 2f, -(TopMargin + CardHeight + DescGap + DescHeight)),
-            new Vector2(rowWidth / 2f, -(TopMargin + CardHeight + DescGap)));
-        var descBg = descBand.gameObject.AddComponent<Image>();
-        descBg.color = CardColor;
-        descBg.sprite = roundedSprite;
-        descBg.type = Image.Type.Sliced;
-
+        // 説明帯（選択中の商品の名前と説明）：ひとつの角丸パネルの中で、上段の帯(exp_bg_upper)を
+        // 下段(exp_bg_bottom)に重ねる。外枠のみ角丸で、上段帯の下側は分割せず地続きにする
         const float DescPadding = 20f;
-        const float DescIconSize = 72f;
-        float descIconX = -rowWidth / 2f + DescPadding + DescIconSize / 2f;
-        float descTextLeft = descIconX + DescIconSize / 2f + 14f;
-        float descTextRight = rowWidth / 2f - DescPadding;
-        float descTextWidth = descTextRight - descTextLeft;
-        float descTextCenterX = (descTextLeft + descTextRight) / 2f;
+        const float DescUpperHeight = 34f;
+        const float DescIconSize = 40f; // 上段帯(34px)より大きくして少しはみ出させる
+        float descContentWidth = RowWidth - DescPadding * 2f;
 
-        var descIcon = CreateImage(descBand, new Color(1f, 1f, 1f, 0.12f), new Vector2(descIconX, 0f), new Vector2(DescIconSize, DescIconSize));
-        descIcon.sprite = roundedSprite;
-        descIcon.type = Image.Type.Sliced;
+        var descBand = CreateRect(mainUiRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(-RowWidth / 2f, -(TopMargin + drinksFrameHeight + DescGap + DescHeight)),
+            new Vector2(RowWidth / 2f, -(TopMargin + drinksFrameHeight + DescGap)));
+
+        var descMaskImage = descBand.gameObject.AddComponent<Image>();
+        descMaskImage.sprite = roundedSprite;
+        descMaskImage.type = Image.Type.Sliced;
+        var descMask = descBand.gameObject.AddComponent<Mask>();
+        descMask.showMaskGraphic = false; // 外枠の角丸切り抜き専用。自身は描画しない
+
+        // 下段：帯いっぱいに敷く
+        var descBottomRect = CreateRect(descBand, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        var descBottomImage = descBottomRect.gameObject.AddComponent<Image>();
+        descBottomImage.sprite = descBottomSprite;
+        descBottomImage.type = Image.Type.Simple;
+        descBottomImage.preserveAspect = false;
+
+        // 上段：上端に固定した帯として下段の上に重ねる（下側は角丸にせず、そのまま下段へ続ける）
+        var descTopRect = CreateRect(descBand, new Vector2(0f, 1f), Vector2.one, new Vector2(0f, -DescUpperHeight), Vector2.zero);
+        var descTopImage = descTopRect.gameObject.AddComponent<Image>();
+        descTopImage.sprite = descUpperSprite;
+        descTopImage.type = Image.Type.Simple;
+        descTopImage.preserveAspect = false;
+
+        // 商品画像（商品名の左に表示。上段の帯より一回り大きくして少しはみ出させる）
+        float descIconX = -RowWidth / 2f + DescPadding + DescIconSize / 2f;
+        float descNameTextLeft = descIconX + DescIconSize / 2f + 8f;
+        float descNameTextRight = RowWidth / 2f - DescPadding;
+        float descNameTextWidth = descNameTextRight - descNameTextLeft;
+        float descNameTextCenterX = (descNameTextLeft + descNameTextRight) / 2f;
+        float descTopCenterY = DescHeight / 2f - DescUpperHeight / 2f; // 上段帯の中心Y（descBand中心基準）
+
+        // descBandはMaskで角丸に切り抜かれているため、はみ出しを見せるにはdescBandの外
+        // （mainUiRoot直下、descBandより後＝手前に描画）にアイコンを置く
+        float descBandTopOffset = -(TopMargin + drinksFrameHeight + DescGap);
+        float descIconCenterYFromTop = descBandTopOffset - DescUpperHeight / 2f;
+        var descIconRect = CreateRect(mainUiRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(descIconX - DescIconSize / 2f, descIconCenterYFromTop - DescIconSize / 2f),
+            new Vector2(descIconX + DescIconSize / 2f, descIconCenterYFromTop + DescIconSize / 2f));
+        descProductIcon = descIconRect.gameObject.AddComponent<Image>();
+        descProductIcon.preserveAspect = true;
 
         descNameText = CreateText(descBand, "", 19f, TextAlignmentOptions.MidlineLeft,
-            new Vector2(descTextCenterX, 24f), new Vector2(descTextWidth, 26f), TextLight);
+            new Vector2(descNameTextCenterX, descTopCenterY), new Vector2(descNameTextWidth, DescUpperHeight), TextLight);
+        if (descFont != null) descNameText.font = descFont;
 
+        // exp_bg_bottomは明るい背景なので、暗い文字色を使う
+        float descBodyCenterY = -DescUpperHeight / 2f; // 下段領域の中心Y（descBand中心基準）
         descBodyText = CreateText(descBand, "", 14f, TextAlignmentOptions.MidlineLeft,
-            new Vector2(descTextCenterX, -10f), new Vector2(descTextWidth, 44f), TextMuted);
+            new Vector2(0f, descBodyCenterY), new Vector2(descContentWidth, DescHeight - DescUpperHeight - 12f), TextDark);
+        if (descFont != null) descBodyText.font = descFont;
         descBodyText.enableWordWrapping = true;
 
         BuildMoneyBadge(mainUiRoot);
@@ -482,6 +561,22 @@ public class ShopUI : MonoBehaviour
         CreateText(closeHint, "とじる", 13f, TextAlignmentOptions.MidlineLeft, new Vector2(24f, 0f), new Vector2(72f, 22f), TextLight);
 
         SetCanvasGroupVisible(revealGroup, false);
+    }
+
+    // 角丸の切り抜き（Mask）を作り、その中いっぱいに画像を敷く。写真アセットを角丸パネルとして使うための共通処理
+    void BuildMaskedBg(RectTransform container, Sprite bgSprite)
+    {
+        var maskImage = container.gameObject.AddComponent<Image>();
+        maskImage.sprite = roundedSprite;
+        maskImage.type = Image.Type.Sliced;
+        var mask = container.gameObject.AddComponent<Mask>();
+        mask.showMaskGraphic = false; // 自身は描画せず、角丸の切り抜き形状としてだけ使う
+
+        var bgRect = CreateRect(container, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        var bgImage = bgRect.gameObject.AddComponent<Image>();
+        bgImage.sprite = bgSprite;
+        bgImage.type = Image.Type.Simple;
+        bgImage.preserveAspect = false; // アスペクト比は無視して枠いっぱいに引き伸ばす
     }
 
     void BuildMoneyBadge(Transform parent)
@@ -552,12 +647,12 @@ public class ShopUI : MonoBehaviour
         CreateText(hintContainer, "せんたく", 13f, TextAlignmentOptions.MidlineLeft, new Vector2(cx + w5 / 2f, 0f), new Vector2(w5, 22f), TextLight);
     }
 
-    // 既存のキーヒント（音楽プレイヤーのB/P/N/U/Rバッジ等）と同じデザイン：
-    // 縁取りなし・うっすら塗りの角丸バッジ＋中央のラベルだけのミニマルな見た目
+    // 既存の常駐UIのキーバッジ（音楽プレイヤーの「N」等）と同じデザイン：
+    // 控えめな角丸四角（角の丸みは小さめ）＋縁取りなし・うっすら塗り＋中央のラベルだけのミニマルな見た目
     void CreateKeyCap(Transform parent, string label, Vector2 anchoredPos, float width)
     {
-        var badge = CreateImage(parent, new Color(1f, 1f, 1f, 0.1f), anchoredPos, new Vector2(width, 20f));
-        badge.sprite = roundedSprite;
+        var badge = CreateImage(parent, new Color(1f, 1f, 1f, 0.08f), anchoredPos, new Vector2(width, 20f));
+        badge.sprite = keyCapSprite;
         badge.type = Image.Type.Sliced;
 
         CreateText(badge.transform, label, 12f, TextAlignmentOptions.Center, Vector2.zero, new Vector2(width, 20f), TextLight);
